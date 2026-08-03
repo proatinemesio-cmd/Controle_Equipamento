@@ -1,0 +1,11 @@
+package com.example.demo.repository;
+
+import com.example.demo.model.Aluno;
+import org.springframework.data.jpa.repository.JpaRepository;
+import java.util.List;
+
+public interface AlunoRepository extends JpaRepository<Aluno, Long> {
+
+    // O Spring gera o SQL de busca automaticamente só pelo nome do método!
+    List<Aluno> findByTurmaId(Long turmaId);
+}
