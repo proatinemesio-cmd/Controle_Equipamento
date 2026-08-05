@@ -16,6 +16,8 @@
         .linha-aluno span { flex: 1; font-size: 14px; }
         .linha-aluno input { width: 80px; padding: 8px; border: 1px solid #ccc; border-radius: 5px; text-align: center; }
 
+        .extra-row { display: flex; gap: 10px; align-items: center; }
+        .btn-remover { background-color: #dc3545; color: white; border: none; padding: 8px 12px; border-radius: 5px; cursor: pointer; font-weight: bold; }
         .btn-extra { background-color: #28a745; color: white; border: none; padding: 10px; border-radius: 5px; cursor: pointer; margin-top: 15px; width: 100%; }
         .btn-salvar { background-color: #0056b3; color: white; border: none; padding: 15px; border-radius: 5px; margin-top: 25px; width: 100%; font-size: 18px; font-weight: bold; cursor: pointer; }
     </style>
@@ -41,9 +43,8 @@
 </div>
 
 <script>
-    const urlBase = '';
+    const urlBase = 'http://localhost:8080';
 
-    // 1. Carrega as turmas quando abre a página
     window.onload = function() {
         fetch(urlBase + '/api/turmas')
             .then(response => response.json())
@@ -56,7 +57,8 @@
             .catch(err => console.error("Erro ao buscar turmas:", err));
     };
 
-    // 2. Busca e exibe os alunos da turma selecionada
+    let alunosDaTurmaAtual = [];
+
     document.getElementById('turma').addEventListener('change', function() {
         const turmaId = this.value;
         const areaAlunos = document.getElementById('areaAlunos');
@@ -65,45 +67,116 @@
         if(!turmaId) {
             areaAlunos.style.display = 'none';
             btnExtra.style.display = 'none';
+            alunosDaTurmaAtual = [];
             return;
         }
 
         fetch(urlBase + '/api/alunos/turma/' + turmaId)
             .then(response => response.json())
             .then(alunos => {
-                areaAlunos.innerHTML = `<h3>Lista de Alunos</h3>`;
-                alunos.forEach(aluno => {
-                    areaAlunos.innerHTML += `
-                            <div class="linha-aluno" data-id="${aluno.id}">
-                                <span>${aluno.nome}</span>
-                                <input type="number" class="equip-input" placeholder="Nº Equipamento">
-                            </div>
-                        `;
-                });
+                alunosDaTurmaAtual = alunos;
+                renderizarTelaAlunos();
                 areaAlunos.style.display = 'block';
                 btnExtra.style.display = 'block';
             });
     });
 
-    // 3. Adicionar linha para aluno extra
-    document.getElementById('btnAdicionarExtra').addEventListener('click', function() {
+    function renderizarTelaAlunos() {
         const areaAlunos = document.getElementById('areaAlunos');
-        areaAlunos.innerHTML += `
-                <div class="linha-aluno extra-row">
-                    <input type="text" class="extra-nome" placeholder="Nome do aluno (Fora da lista)" style="flex: 1; margin-right: 10px;">
-                    <input type="number" class="extra-equip" placeholder="Nº Tablet">
+
+        const dadosDigitados = {};
+        document.querySelectorAll('.linha-aluno[data-id]').forEach(linha => {
+            const alunoId = linha.getAttribute('data-id');
+            const valorInput = linha.querySelector('.equip-input').value;
+            if (valorInput) {
+                dadosDigitados[alunoId] = valorInput;
+            }
+        });
+
+        const extrasSalvos = [];
+        document.querySelectorAll('.extra-row').forEach(linha => {
+            const nome = linha.querySelector('.extra-nome').value;
+            const equip = linha.querySelector('.extra-equip').value;
+            extrasSalvos.push({ nome, equip });
+        });
+
+        areaAlunos.innerHTML = `<h3>Lista de Alunos</h3>`;
+
+        alunosDaTurmaAtual.forEach(aluno => {
+            const valorSalvo = dadosDigitados[aluno.id] || '';
+            areaAlunos.innerHTML += `
+                <div class="linha-aluno" data-id="${aluno.id}">
+                    <span>${aluno.nome}</span>
+                    <input type="number" class="equip-input" placeholder="Nº Equipamento" value="${valorSalvo}">
                 </div>
             `;
+        });
+
+        extrasSalvos.forEach((extra, index) => {
+            areaAlunos.innerHTML += `
+                <div class="linha-aluno extra-row" data-index="${index}">
+                    <input type="text" class="extra-nome" placeholder="Nome do aluno (Fora da lista)" value="${extra.nome}" style="flex: 1;">
+                    <input type="number" class="extra-equip" placeholder="Nº Equip" value="${extra.equip}" style="width: 80px;">
+                    <button type="button" class="btn-remover" onclick="removerExtra(this)">X</button>
+                </div>
+            `;
+        });
+    }
+
+    // Função para remover a linha extra específica
+    window.removerExtra = function(botao) {
+        botao.closest('.extra-row').remove();
+    };
+
+    document.getElementById('btnAdicionarExtra').addEventListener('click', function() {
+        const areaAlunos = document.getElementById('areaAlunos');
+
+        const dadosDigitados = {};
+        document.querySelectorAll('.linha-aluno[data-id]').forEach(linha => {
+            const alunoId = linha.getAttribute('data-id');
+            const valorInput = linha.querySelector('.equip-input').value;
+            if (valorInput) dadosDigitados[alunoId] = valorInput;
+        });
+
+        const extrasSalvos = [];
+        document.querySelectorAll('.extra-row').forEach(linha => {
+            const nome = linha.querySelector('.extra-nome').value;
+            const equip = linha.querySelector('.extra-equip').value;
+            extrasSalvos.push({ nome, equip });
+        });
+
+        // Adiciona um novo extra vazio
+        extrasSalvos.push({ nome: '', equip: '' });
+
+        areaAlunos.innerHTML = `<h3>Lista de Alunos</h3>`;
+        alunosDaTurmaAtual.forEach(aluno => {
+            const valorSalvo = dadosDigitados[aluno.id] || '';
+            areaAlunos.innerHTML += `
+                <div class="linha-aluno" data-id="${aluno.id}">
+                    <span>${aluno.nome}</span>
+                    <input type="number" class="equip-input" placeholder="Nº Equipamento" value="${valorSalvo}">
+                </div>
+            `;
+        });
+
+        extrasSalvos.forEach((extra, index) => {
+            areaAlunos.innerHTML += `
+                <div class="linha-aluno extra-row" data-index="${index}">
+                    <input type="text" class="extra-nome" placeholder="Nome do aluno (Fora da lista)" value="${extra.nome}" style="flex: 1;">
+                    <input type="number" class="extra-equip" placeholder="Nº Equip" value="${extra.equip}" style="width: 80px;">
+                    <button type="button" class="btn-remover" onclick="removerExtra(this)">X</button>
+                </div>
+            `;
+        });
     });
 
-    // 4. Salvar tudo em lote
     document.getElementById('btnSalvar').addEventListener('click', function() {
         const professor = document.getElementById('professor').value;
         if(!professor) { alert("Preencha o nome do professor!"); return; }
 
         const promessas = [];
 
-        // Pega os alunos normais que tiveram o tablet preenchido
+        // Alunos normais
         document.querySelectorAll('.linha-aluno[data-id]').forEach(linha => {
             const inputEquip = linha.querySelector('.equip-input');
             if(inputEquip.value.trim() !== '') {
@@ -119,33 +192,48 @@
             }
         });
 
-        // Pega os alunos extras que foram digitados manualmente
+        // Alunos extras (Validação inteligente: só envia se tiver tanto o nome quanto o número preenchidos)
+        let erroExtraIncompleto = false;
         document.querySelectorAll('.extra-row').forEach(linha => {
             const inputNome = linha.querySelector('.extra-nome');
             const inputEquip = linha.querySelector('.extra-equip');
-            if(inputNome.value.trim() !== '' && inputEquip.value.trim() !== '') {
+            const nomeVal = inputNome.value.trim();
+            const equipVal = inputEquip.value.trim();
+
+            // Se preencheu um e esqueceu o outro, avisa o usuário
+            if((nomeVal !== '' && equipVal === '') || (nomeVal === '' && equipVal !== '')) {
+                erroExtraIncompleto = true;
+            }
+
+            // Se ambos estiverem preenchidos, envia
+            if(nomeVal !== '' && equipVal !== '') {
                 promessas.push(fetch(urlBase + '/api/registros', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
                         nomeProfessor: professor,
-                        numeroEquipamento: inputEquip.value,
-                        nomeAlunoExtra: inputNome.value
+                        numeroEquipamento: equipVal,
+                        nomeAlunoExtra: nomeVal
                     })
                 }));
             }
         });
+
+        if(erroExtraIncompleto) {
+            alert("⚠️ Há um aluno extra com o nome ou o equipamento incompleto. Preencha ambos ou remova a linha.");
+            return;
+        }
 
         if(promessas.length === 0) {
             alert("Nenhum equipamento foi preenchido para salvar.");
             return;
         }
 
-        // Executa todas as requisições e avisa quando terminar
         Promise.all(promessas).then(() => {
             alert("✅ Todos os registros salvos com sucesso!");
-            // Limpa os inputs para a próxima aula
             document.querySelectorAll('input[type="number"], .extra-nome').forEach(input => input.value = '');
+            // Remove as linhas extras excedentes após salvar
+            document.querySelectorAll('.extra-row').forEach(linha => linha.remove());
         }).catch(() => {
             alert("❌ Ocorreu um erro ao salvar alguns registros.");
         });

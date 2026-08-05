@@ -31,15 +31,25 @@ public class EquipamentoController {
         return turmaRepository.findAll();
     }
 
+    @GetMapping("/alunos/{id}")
+    public Aluno buscarAlunoPorId(@PathVariable Long id) {
+        return alunoRepository.findById(id).orElse(null);
+    }
     // Rota 2: O celular avisa qual turma foi selecionada e pede os alunos dela
     @GetMapping("/alunos/turma/{turmaId}")
     public List<Aluno> listarAlunosPorTurma(@PathVariable Long turmaId) {
         return alunoRepository.findByTurmaId(turmaId);
     }
-
     // Rota 3: O celular envia o formulário preenchido para salvar no banco
     @PostMapping("/registros")
     public Registro salvarRegistro(@RequestBody Registro registro) {
         return registroRepository.save(registro);
     }
+
+    @GetMapping("/registros")
+    public List<Registro> listarRegistros() {
+        return registroRepository.findAll();
+    }
 }
+
+

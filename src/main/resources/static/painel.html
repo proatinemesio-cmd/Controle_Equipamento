@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel de Visualização - Retiradas</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; background-color: #f4f4f9; }
+        .container { background-color: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #333; }
+
+        .filtro-box { background: #e2e8f0; padding: 15px; border-radius: 5px; margin-bottom: 20px; display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap; }
+        .filtro-box div { flex: 1; min-width: 150px; }
+        .filtro-box label { display: block; font-weight: bold; font-size: 13px; margin-bottom: 5px; color: #333; }
+        .filtro-box input { width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px; box-sizing: border-box; }
+        .btn-filtrar { background-color: #0056b3; color: white; border: none; padding: 9px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; height: 36px; }
+
+        .card-horario { background: #fff; border: 1px solid #ddd; border-left: 5px solid #0056b3; margin-top: 15px; padding: 15px; border-radius: 5px; cursor: pointer; transition: 0.2s; }
+        .card-horario:hover { background: #f9f9f9; }
+        .card-header { display: flex; justify-content: space-between; align-items: center; }
+        .card-header h3 { margin: 0; color: #333; font-size: 16px; }
+        .card-header span { font-size: 14px; color: #666; background: #e2e8f0; padding: 4px 8px; border-radius: 4px; }
+
+        .detalhes-conteudo { display: none; margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px; }
+        .equip-badge { display: inline-block; background: #e0f2fe; color: #0369a1; padding: 4px 8px; border-radius: 4px; margin-right: 5px; font-weight: bold; font-size: 13px; }
+
+        ul { padding-left: 20px; margin: 10px 0; }
+        li { font-size: 14px; color: #444; padding: 3px 0; }
+        .aluno-com-equip { font-weight: bold; color: #16a34a; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h2>📊 Painel de Retiradas por Horário</h2>
+
+    <!-- Filtro por Data -->
+    <div class="filtro-box">
+        <div>
+            <label>Data Inicial:</label>
+            <input type="date" id="dataInicio">
+        </div>
+        <div>
+            <label>Data Final:</label>
+            <input type="date" id="dataFim">
+        </div>
+        <div>
+            <button class="btn-filtrar" onclick="carregarRegistrosPainel()">Filtrar</button>
+        </div>
+    </div>
+
+    <div id="listaPaineis">
+        <p style="text-align: center;">Carregando registros...</p>
+    </div>
+</div>
+
+<script>
+    const urlBase = 'http://localhost:8080';
+
+    window.onload = function() {
+        carregarRegistrosPainel();
+    };
+
+    function carregarRegistrosPainel() {
+        fetch(urlBase + '/api/registros')
+            .then(res => res.json())
+            .then(registros => {
+                const container = document.getElementById('listaPaineis');
+                container.innerHTML = '';
+
+                const dataInicioVal = document.getElementById('dataInicio').value;
+                const dataFimVal = document.getElementById('dataFim').value;
+
+                let registrosFiltrados = registros.filter(reg => {
+                    if (!reg.dataHora) return true;
+                    let dataReg = reg.dataHora.split('T')[0];
+
+                    if (dataInicioVal && dataReg < dataInicioVal) return false;
+                    if (dataFimVal && dataReg > dataFimVal) return false;
+                    return true;
+                });
+
+                if (registrosFiltrados.length === 0) {
+                    container.innerHTML = '<p style="text-align: center; color: #999;">Nenhum registro encontrado para o período selecionado.</p>';
+                    return;
+                }
+
+                const agrupados = {};
+
+                registrosFiltrados.forEach(reg => {
+                    let dataObj = new Date(reg.dataHora);
+                    let dia = dataObj.toLocaleDateString();
+                    let horaMinuto = dataObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+                    let chave = `${reg.nomeProfessor} - ${dia} às ${horaMinuto}`;
+
+                    if (!agrupados[chave]) {
+                        agrupados[chave] = {
+                            professor: reg.nomeProfessor,
+                            horarioFormatado: `${dia} - ${horaMinuto}`,
+                            dataMaisRecente: dataObj.getTime(), // Guardamos o timestamp para ordenar do mais novo para o mais antigo
+                            itens: []
+                        };
+                    }
+                    agrupados[chave].itens.push(reg);
+                });
+
+                // Transforma o objeto em array e ordena do MAIS NOVO para o MAIS ANTIGO
+                let gruposArray = Object.values(agrupados);
+                gruposArray.sort((a, b) => b.dataMaisRecente - a.dataMaisRecente);
+
+                // Aplica o limite de no máximo 20 exibições por tela
+                let gruposLimitados = gruposArray.slice(0, 20);
+
+                gruposLimitados.forEach(grupo => {
+                    let divCard = document.createElement('div');
+                    divCard.className = 'card-horario';
+
+                    let equipamentosUnicos = [...new Set(grupo.itens.map(i => i.numeroEquipamento))];
+                    let equipamentosResumo = equipamentosUnicos.map(eq => `Eq. ${eq}`).join(', ');
+
+                    divCard.innerHTML = `
+                        <div class="card-header" onclick="toggleDetalhes(this)">
+                            <div>
+                                <h3>👨‍🏫 Professor(a): ${grupo.professor}</h3>
+                                <small>Equipamentos retirados: <span class="equip-badge">${equipamentosResumo}</span></small>
+                            </div>
+                            <span>🕒 ${grupo.horarioFormatado}</span>
+                        </div>
+                        <div class="detalhes-conteudo">
+                            <p><strong>Carregando dados...</strong></p>
+                        </div>
+                    `;
+
+                    divCard.dataset.registros = JSON.stringify(grupo.itens);
+                    container.appendChild(divCard);
+                });
+            })
+            .catch(err => {
+                console.error(err);
+                document.getElementById('listaPaineis').innerHTML = '<p style="text-align: center; color: red;">Erro ao carregar painel.</p>';
+            });
+    }
+
+    window.toggleDetalhes = function(element) {
+        let card = element.closest('.card-horario');
+        let conteudo = card.querySelector('.detalhes-conteudo');
+        let itens = JSON.parse(card.dataset.registros);
+
+        if (conteudo.style.display === 'block') {
+            conteudo.style.display = 'none';
+            return;
+        }
+
+        conteudo.style.display = 'block';
+
+        let primeiroItemComAluno = itens.find(i => i.aluno && i.aluno.id);
+
+        if (!primeiroItemComAluno) {
+            let htmlExtras = '<h4>Alunos Retirantes (Alunos Extras):</h4><ul>';
+            itens.forEach(i => {
+                let nomeEx = i.nomeAlunoExtra ? i.nomeAlunoExtra : "Aluno";
+                htmlExtras += `<li><span class="aluno-com-equip">✅ ${nomeEx}</span> — <strong>Equipamento: ${i.numeroEquipamento}</strong></li>`;
+            });
+            htmlExtras += '</ul>';
+            conteudo.innerHTML = htmlExtras;
+            return;
+        }
+
+        fetch(urlBase + '/api/alunos/' + primeiroItemComAluno.aluno.id)
+            .then(res => res.json())
+            .then(alunoExemplo => {
+                if (!alunoExemplo || !alunoExemplo.turma) {
+                    throw new Error("Turma não encontrada");
+                }
+                return fetch(urlBase + '/api/alunos/turma/' + alunoExemplo.turma.id)
+                    .then(res => res.json())
+                    .then(todosAlunosDaTurma => {
+                        todosAlunosDaTurma.sort((a, b) => a.nome.localeCompare(b.nome));
+
+                        let html = `<h4>Turma (${alunoExemplo.turma.nome}) - Lista Completa:</h4><ul>`;
+
+                        todosAlunosDaTurma.forEach(alunoTurma => {
+                            let registroDoAluno = itens.find(i => i.aluno && i.aluno.id === alunoTurma.id);
+
+                            if (registroDoAluno) {
+                                html += `<li class="aluno-com-equip">✅ ${alunoTurma.nome} — <strong>Pegou o Equipamento: ${registroDoAluno.numeroEquipamento}</strong></li>`;
+                            } else {
+                                html += `<li style="color: #888;">⚪ ${alunoTurma.nome} (Sem equipamento)</li>`;
+                            }
+                        });
+
+                        itens.filter(i => !i.aluno && i.nomeAlunoExtra).forEach(extra => {
+                            html += `<li class="aluno-com-equip">✅ [Extra] ${extra.nomeAlunoExtra} — <strong>Pegou o Equipamento: ${extra.numeroEquipamento}</strong></li>`;
+                        });
+
+                        html += `</ul>`;
+                        conteudo.innerHTML = html;
+                    });
+            })
+            .catch(err => {
+                console.error(err);
+                conteudo.innerHTML = '<p style="color: red;">Erro ao montar a lista da turma.</p>';
+            });
+    };
+</script>
+</body>
+</html>
