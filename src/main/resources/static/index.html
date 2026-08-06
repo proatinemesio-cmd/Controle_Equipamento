@@ -3,43 +3,46 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Retirada de Equipamentos</title>
+    <title>Controle de Retirada de Equipamentos</title>
     <style>
         body { font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto; background-color: #f4f4f9; }
         .container { background-color: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
         h2 { text-align: center; color: #333; }
         label { font-weight: bold; display: block; margin-top: 15px; color: #555; }
-        select, input[type="text"] { width: 100%; padding: 12px; margin-top: 5px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
+        select, input[type="text"], input[type="number"] { width: 100%; padding: 12px; margin-top: 5px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
 
         .lista-alunos { margin-top: 20px; border-top: 2px solid #eee; padding-top: 15px; }
         .linha-aluno { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #eee; }
         .linha-aluno span { flex: 1; font-size: 14px; }
-        .linha-aluno input { width: 80px; padding: 8px; border: 1px solid #ccc; border-radius: 5px; text-align: center; }
+        .linha-aluno input { width: 90px; padding: 8px; border: 1px solid #ccc; border-radius: 5px; text-align: center; }
 
-        .extra-row { display: flex; gap: 10px; align-items: center; }
+        .extra-row { display: flex; gap: 10px; align-items: center; margin-bottom: 8px; }
         .btn-remover { background-color: #dc3545; color: white; border: none; padding: 8px 12px; border-radius: 5px; cursor: pointer; font-weight: bold; }
-        .btn-extra { background-color: #28a745; color: white; border: none; padding: 10px; border-radius: 5px; cursor: pointer; margin-top: 15px; width: 100%; }
-        .btn-salvar { background-color: #0056b3; color: white; border: none; padding: 15px; border-radius: 5px; margin-top: 25px; width: 100%; font-size: 18px; font-weight: bold; cursor: pointer; }
+        .btn-extra { background-color: #17a2b8; color: white; border: none; padding: 10px; border-radius: 5px; cursor: pointer; margin-top: 15px; width: 100%; font-weight: bold; }
+        .btn-salvar { background-color: #28a745; color: white; border: none; padding: 15px; border-radius: 5px; margin-top: 25px; width: 100%; font-size: 18px; font-weight: bold; cursor: pointer; }
+        .btn-salvar:hover { background-color: #218838; }
     </style>
 </head>
 <body>
 <div class="container">
-    <h2>Controle de Equipamentos</h2>
+    <h2>💻 Controle de Equipamentos</h2>
 
-    <label>Nome do Professor:</label>
-    <input type="text" id="professor" placeholder="Digite seu nome">
+    <form id="formRetirada">
+        <label>Nome do Professor:</label>
+        <input type="text" id="professor" placeholder="Digite seu nome" required>
 
-    <label>Turma:</label>
-    <select id="turma">
-        <option value="">Selecione uma turma...</option>
-    </select>
+        <label>Turma:</label>
+        <select id="turma">
+            <option value="">Selecione uma turma...</option>
+        </select>
 
-    <div id="areaAlunos" class="lista-alunos" style="display: none;">
-    </div>
+        <div id="areaAlunos" class="lista-alunos" style="display: none;">
+        </div>
 
-    <button id="btnAdicionarExtra" class="btn-extra" style="display: none;">+ Adicionar aluno que não está na lista</button>
+        <button type="button" id="btnAdicionarExtra" class="btn-extra" style="display: none;">+ Adicionar aluno que não está na lista</button>
 
-    <button id="btnSalvar" class="btn-salvar">Registrar Retirada</button>
+        <button type="button" id="btnSalvar" class="btn-salvar">Registrar Retirada</button>
+    </form>
 </div>
 
 <script>
@@ -74,6 +77,7 @@
         fetch(urlBase + '/api/alunos/turma/' + turmaId)
             .then(response => response.json())
             .then(alunos => {
+                alunos.sort((a, b) => a.nome.localeCompare(b.nome));
                 alunosDaTurmaAtual = alunos;
                 renderizarTelaAlunos();
                 areaAlunos.style.display = 'block';
@@ -107,7 +111,7 @@
             areaAlunos.innerHTML += `
                 <div class="linha-aluno" data-id="${aluno.id}">
                     <span>${aluno.nome}</span>
-                    <input type="number" class="equip-input" placeholder="Nº Equipamento" value="${valorSalvo}">
+                    <input type="text" class="equip-input" placeholder="Nº Equip" value="${valorSalvo}">
                 </div>
             `;
         });
@@ -115,15 +119,14 @@
         extrasSalvos.forEach((extra, index) => {
             areaAlunos.innerHTML += `
                 <div class="linha-aluno extra-row" data-index="${index}">
-                    <input type="text" class="extra-nome" placeholder="Nome do aluno (Fora da lista)" value="${extra.nome}" style="flex: 1;">
-                    <input type="number" class="extra-equip" placeholder="Nº Equip" value="${extra.equip}" style="width: 80px;">
+                    <input type="text" class="extra-nome" placeholder="Nome do aluno extra" value="${extra.nome}" style="flex: 1;">
+                    <input type="text" class="extra-equip" placeholder="Nº Equip" value="${extra.equip}" style="width: 90px;">
                     <button type="button" class="btn-remover" onclick="removerExtra(this)">X</button>
                 </div>
             `;
         });
     }
 
-    // Função para remover a linha extra específica
     window.removerExtra = function(botao) {
         botao.closest('.extra-row').remove();
     };
@@ -145,7 +148,6 @@
             extrasSalvos.push({ nome, equip });
         });
 
-        // Adiciona um novo extra vazio
         extrasSalvos.push({ nome: '', equip: '' });
 
         areaAlunos.innerHTML = `<h3>Lista de Alunos</h3>`;
@@ -154,7 +156,7 @@
             areaAlunos.innerHTML += `
                 <div class="linha-aluno" data-id="${aluno.id}">
                     <span>${aluno.nome}</span>
-                    <input type="number" class="equip-input" placeholder="Nº Equipamento" value="${valorSalvo}">
+                    <input type="text" class="equip-input" placeholder="Nº Equip" value="${valorSalvo}">
                 </div>
             `;
         });
@@ -162,8 +164,8 @@
         extrasSalvos.forEach((extra, index) => {
             areaAlunos.innerHTML += `
                 <div class="linha-aluno extra-row" data-index="${index}">
-                    <input type="text" class="extra-nome" placeholder="Nome do aluno (Fora da lista)" value="${extra.nome}" style="flex: 1;">
-                    <input type="number" class="extra-equip" placeholder="Nº Equip" value="${extra.equip}" style="width: 80px;">
+                    <input type="text" class="extra-nome" placeholder="Nome do aluno extra" value="${extra.nome}" style="flex: 1;">
+                    <input type="text" class="extra-equip" placeholder="Nº Equip" value="${extra.equip}" style="width: 90px;">
                     <button type="button" class="btn-remover" onclick="removerExtra(this)">X</button>
                 </div>
             `;
@@ -171,12 +173,18 @@
     });
 
     document.getElementById('btnSalvar').addEventListener('click', function() {
-        const professor = document.getElementById('professor').value;
+        const professor = document.getElementById('professor').value.trim();
+
         if(!professor) { alert("Preencha o nome do professor!"); return; }
 
         const promessas = [];
 
-        // Alunos normais
+        // Gera a data e hora local correta compensando o fuso do Brasil
+        const agora = new Date();
+        const offsetMs = agora.getTimezoneOffset() * 60 * 1000;
+        const dataLocal = new Date(agora.getTime() - offsetMs).toISOString().slice(0, 19);
+
+        // Alunos normais da lista
         document.querySelectorAll('.linha-aluno[data-id]').forEach(linha => {
             const inputEquip = linha.querySelector('.equip-input');
             if(inputEquip.value.trim() !== '') {
@@ -185,14 +193,15 @@
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
                         nomeProfessor: professor,
-                        numeroEquipamento: inputEquip.value,
+                        numeroEquipamento: inputEquip.value.trim(),
+                        dataHora: dataLocal,
                         aluno: { id: linha.getAttribute('data-id') }
                     })
                 }));
             }
         });
 
-        // Alunos extras (Validação inteligente: só envia se tiver tanto o nome quanto o número preenchidos)
+        // Alunos extras
         let erroExtraIncompleto = false;
         document.querySelectorAll('.extra-row').forEach(linha => {
             const inputNome = linha.querySelector('.extra-nome');
@@ -200,12 +209,10 @@
             const nomeVal = inputNome.value.trim();
             const equipVal = inputEquip.value.trim();
 
-            // Se preencheu um e esqueceu o outro, avisa o usuário
             if((nomeVal !== '' && equipVal === '') || (nomeVal === '' && equipVal !== '')) {
                 erroExtraIncompleto = true;
             }
 
-            // Se ambos estiverem preenchidos, envia
             if(nomeVal !== '' && equipVal !== '') {
                 promessas.push(fetch(urlBase + '/api/registros', {
                     method: 'POST',
@@ -213,6 +220,7 @@
                     body: JSON.stringify({
                         nomeProfessor: professor,
                         numeroEquipamento: equipVal,
+                        dataHora: dataLocal,
                         nomeAlunoExtra: nomeVal
                     })
                 }));
@@ -231,12 +239,25 @@
 
         Promise.all(promessas).then(() => {
             alert("✅ Todos os registros salvos com sucesso!");
-            document.querySelectorAll('input[type="number"], .extra-nome').forEach(input => input.value = '');
-            // Remove as linhas extras excedentes após salvar
-            document.querySelectorAll('.extra-row').forEach(linha => linha.remove());
+            location.reload();
         }).catch(() => {
             alert("❌ Ocorreu um erro ao salvar alguns registros.");
         });
+    });
+
+    // Pular para o próximo campo ao apertar ENTER
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Enter') {
+            const focusableElements = Array.from(document.querySelectorAll('input, select, button'));
+            const index = focusableElements.indexOf(document.activeElement);
+
+            if (index > -1 && focusableElements[index + 1]) {
+                if (document.activeElement.id !== 'btnSalvar') {
+                    event.preventDefault();
+                    focusableElements[index + 1].focus();
+                }
+            }
+        }
     });
 </script>
 </body>
