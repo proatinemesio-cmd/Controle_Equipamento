@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Controle de Retirada de Equipamentos </title>
+    <title>Controle de Retirada de Equipamentos</title>
     <style>
         body { font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto; background-color: #f4f4f9; }
         .container { background-color: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
@@ -218,6 +218,7 @@
     document.getElementById('btnSalvar').addEventListener('click', function() {
         const professor = document.getElementById('professor').value.trim();
         const turmaId = document.getElementById('turma').value;
+        const btnSalvar = document.getElementById('btnSalvar');
 
         if(!professor) { alert("Preencha o nome do professor!"); return; }
         if(!turmaId) { alert("Selecione uma turma!"); return; }
@@ -282,11 +283,19 @@
             return;
         }
 
+        // Feedback visual de carregamento no botão
+        btnSalvar.disabled = true;
+        btnSalvar.style.backgroundColor = '#6c757d';
+        btnSalvar.innerHTML = '⏳ Salvando registros, aguarde...';
+
         Promise.all(promessas).then(() => {
             alert("✅ Todos os registros salvos com sucesso!");
             location.reload();
         }).catch(() => {
             alert("❌ Ocorreu um erro ao salvar alguns registros.");
+            btnSalvar.disabled = false;
+            btnSalvar.style.backgroundColor = '#28a745';
+            btnSalvar.innerHTML = 'Registrar Retirada';
         });
     });
 

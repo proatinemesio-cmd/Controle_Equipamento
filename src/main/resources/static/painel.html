@@ -87,17 +87,13 @@
                     container.innerHTML = '<p style="text-align: center; color: #999;">Nenhum registro encontrado para o período selecionado.</p>';
                     return;
                 }
-
-                // Agrupamento Inteligente por Professor e Bloco de Horário (considerando a mesma turma/retirada em lote)
                 const agrupados = {};
 
                 registrosFiltrados.forEach(reg => {
                     let dataObj = new Date(reg.dataHora);
                     let dia = dataObj.toLocaleDateString();
-                    // Arredonda para o mesmo minuto para unificar disparos em lote do mesmo professor
                     let horaMinuto = dataObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-                    // Chave unificada por professor + dia + minuto exato da requisição em lote
+                    
                     let chave = `${reg.nomeProfessor}_${dia}_${horaMinuto}`;
 
                     if (!agrupados[chave]) {
