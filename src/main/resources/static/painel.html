@@ -3,205 +3,137 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Painel de Visualização - Retiradas</title>
+    <title>Painel de Registros de Equipamentos</title>
     <style>
         body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; background-color: #f4f4f9; }
         .container { background-color: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
         h2 { text-align: center; color: #333; }
 
-        .filtro-box { background: #e2e8f0; padding: 15px; border-radius: 5px; margin-bottom: 20px; display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap; }
-        .filtro-box div { flex: 1; min-width: 150px; }
-        .filtro-box label { display: block; font-weight: bold; font-size: 13px; margin-bottom: 5px; color: #333; }
-        .filtro-box input { width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px; box-sizing: border-box; }
-        .btn-filtrar { background-color: #0056b3; color: white; border: none; padding: 9px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; height: 36px; }
+        .filtros-container { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        .filtros-container input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 5px; min-width: 200px; }
 
-        .card-horario { background: #fff; border: 1px solid #ddd; border-left: 5px solid #0056b3; margin-top: 15px; padding: 15px; border-radius: 5px; cursor: pointer; transition: 0.2s; }
-        .card-horario:hover { background: #f9f9f9; }
-        .card-header { display: flex; justify-content: space-between; align-items: center; }
-        .card-header h3 { margin: 0; color: #333; font-size: 16px; }
-        .card-header span { font-size: 14px; color: #666; background: #e2e8f0; padding: 4px 8px; border-radius: 4px; }
-
-        .detalhes-conteudo { display: none; margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px; }
-        .equip-badge { display: inline-block; background: #e0f2fe; color: #0369a1; padding: 4px 8px; border-radius: 4px; margin-right: 5px; font-weight: bold; font-size: 13px; }
-
-        ul { padding-left: 20px; margin: 10px 0; }
-        li { font-size: 14px; color: #444; padding: 3px 0; }
-        .aluno-com-equip { font-weight: bold; color: #16a34a; }
+        .tabela-registros { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        .tabela-registros th, .tabela-registros td { border: 1px solid #ddd; padding: 10px; text-align: left; font-size: 14px; }
+        .tabela-registros th { background-color: #007bff; color: white; }
+        .tabela-registros tr:nth-child(even) { background-color: #f9f9f9; }
+        .sem-registros { text-align: center; padding: 20px; color: #777; font-style: italic; }
     </style>
 </head>
 <body>
 <div class="container">
-    <h2>📊 Painel de Retiradas por Horário</h2>
+    <h2>📊 Painel de Retiradas</h2>
 
-    <!-- Filtro por Data -->
-    <div class="filtro-box">
-        <div>
-            <label>Data Inicial:</label>
-            <input type="date" id="dataInicio">
-        </div>
-        <div>
-            <label>Data Final:</label>
-            <input type="date" id="dataFim">
-        </div>
-        <div>
-            <button class="btn-filtrar" onclick="carregarRegistrosPainel()">Filtrar</button>
-        </div>
+    <div class="filtros-container">
+        <input type="text" id="barraPesquisa" placeholder="Pesquisar por aluno, professor ou série..." onkeyup="filtrarTabelaLocal()">
+        <input type="date" id="filtroData" onchange="carregarRegistrosPainel()" style="flex: 0 0 160px;">
     </div>
 
-    <div id="listaPaineis">
-        <p style="text-align: center;">Carregando registros...</p>
-    </div>
+    <table class="tabela-registros">
+        <thead>
+        <tr>
+            <th>Data/Hora</th>
+            <th>Professor</th>
+            <th>Registro (Nome - N° Equipamento)</th>
+            <th>Tipo</th>
+        </tr>
+        </thead>
+        <tbody id="corpoTabela">
+        <tr><td colspan="4" class="sem-registros">Carregando registros de hoje...</td></tr>
+        </tbody>
+    </table>
 </div>
 
 <script>
     const urlBase = '';
+    let todosOsRegistrosDoDia = [];
 
     window.onload = function() {
+        // Define a data de hoje por padrão no input de data
+        const hoje = new Date().toISOString().split('T')[0];
+        document.getElementById('filtroData').value = hoje;
+
         carregarRegistrosPainel();
     };
 
-    function carregarRegistrosPainel() {
-        fetch(urlBase + '/api/registros')
-            .then(res => res.json())
-            .then(registros => {
-                const container = document.getElementById('listaPaineis');
-                container.innerHTML = '';
+    // Função para carregar os registros da data selecionada
+    async function carregarRegistrosPainel() {
+        const dataSelecionada = document.getElementById('filtroData').value;
+        let url = urlBase + '/api/registros';
 
-                const dataInicioVal = document.getElementById('dataInicio').value;
-                const dataFimVal = document.getElementById('dataFim').value;
+        if (dataSelecionada) {
+            url += `?data=${dataSelecionada}`;
+        }
 
-                let registrosFiltrados = registros.filter(reg => {
-                    if (!reg.dataHora) return true;
-                    let dataReg = reg.dataHora.split('T')[0];
-
-                    if (dataInicioVal && dataReg < dataInicioVal) return false;
-                    if (dataFimVal && dataReg > dataFimVal) return false;
-                    return true;
-                });
-
-                if (registrosFiltrados.length === 0) {
-                    container.innerHTML = '<p style="text-align: center; color: #999;">Nenhum registro encontrado para o período selecionado.</p>';
-                    return;
-                }
-
-                const agrupados = {};
-
-                registrosFiltrados.forEach(reg => {
-                    let dataObj = new Date(reg.dataHora);
-                    let dia = dataObj.toLocaleDateString();
-                    let horaMinuto = dataObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-                    let chave = `${reg.nomeProfessor} - ${dia} às ${horaMinuto}`;
-
-                    if (!agrupados[chave]) {
-                        agrupados[chave] = {
-                            professor: reg.nomeProfessor,
-                            horarioFormatado: `${dia} - ${horaMinuto}`,
-                            dataMaisRecente: dataObj.getTime(), // Guardamos o timestamp para ordenar do mais novo para o mais antigo
-                            itens: []
-                        };
-                    }
-                    agrupados[chave].itens.push(reg);
-                });
-
-                // Transforma o objeto em array e ordena do MAIS NOVO para o MAIS ANTIGO
-                let gruposArray = Object.values(agrupados);
-                gruposArray.sort((a, b) => b.dataMaisRecente - a.dataMaisRecente);
-
-                // Aplica o limite de no máximo 20 exibições por tela
-                let gruposLimitados = gruposArray.slice(0, 20);
-
-                gruposLimitados.forEach(grupo => {
-                    let divCard = document.createElement('div');
-                    divCard.className = 'card-horario';
-
-                    let equipamentosUnicos = [...new Set(grupo.itens.map(i => i.numeroEquipamento))];
-                    let equipamentosResumo = equipamentosUnicos.map(eq => `Eq. ${eq}`).join(', ');
-
-                    divCard.innerHTML = `
-                        <div class="card-header" onclick="toggleDetalhes(this)">
-                            <div>
-                                <h3>👨‍🏫 Professor(a): ${grupo.professor}</h3>
-                                <small>Equipamentos retirados: <span class="equip-badge">${equipamentosResumo}</span></small>
-                            </div>
-                            <span>🕒 ${grupo.horarioFormatado}</span>
-                        </div>
-                        <div class="detalhes-conteudo">
-                            <p><strong>Carregando dados...</strong></p>
-                        </div>
-                    `;
-
-                    divCard.dataset.registros = JSON.stringify(grupo.itens);
-                    container.appendChild(divCard);
-                });
-            })
-            .catch(err => {
-                console.error(err);
-                document.getElementById('listaPaineis').innerHTML = '<p style="text-align: center; color: red;">Erro ao carregar painel.</p>';
-            });
+        try {
+            const resposta = await fetch(url);
+            todosOsRegistrosDoDia = await resposta.json();
+            renderizarTabela(todosOsRegistrosDoDia);
+        } catch (erro) {
+            console.error("Erro ao carregar registros:", erro);
+            document.getElementById('corpoTabela').innerHTML = `<tr><td colspan="4" class="sem-registros" style="color: red;">Erro ao carregar dados do servidor.</td></tr>`;
+        }
     }
 
-    window.toggleDetalhes = function(element) {
-        let card = element.closest('.card-horario');
-        let conteudo = card.querySelector('.detalhes-conteudo');
-        let itens = JSON.parse(card.dataset.registros);
+    function renderizarTabela(registros) {
+        const corpoTabela = document.getElementById('corpoTabela');
+        corpoTabela.innerHTML = '';
 
-        if (conteudo.style.display === 'block') {
-            conteudo.style.display = 'none';
+        if (!registros || registros.length === 0) {
+            corpoTabela.innerHTML = `<tr><td colspan="4" class="sem-registros">Nenhum registro encontrado para esta data.</td></tr>`;
             return;
         }
 
-        conteudo.style.display = 'block';
+        registros.forEach(reg => {
+            let nomeAluno = '';
+            if (reg.aluno && reg.aluno.nome) {
+                nomeAluno = reg.aluno.nome;
+            } else if (reg.nomeAlunoExtra) {
+                nomeAluno = reg.nomeAlunoExtra;
+            } else {
+                nomeAluno = 'Aluno não identificado';
+            }
 
-        let primeiroItemComAluno = itens.find(i => i.aluno && i.aluno.id);
+            // Formata a data e hora bonita (Ex: 07/08/2026 14:30)
+            let dataFormatada = '';
+            if (reg.dataHora) {
+                const dataObj = new Date(reg.dataHora);
+                dataFormatada = dataObj.toLocaleString('pt-BR');
+            }
 
-        if (!primeiroItemComAluno) {
-            let htmlExtras = '<h4>Alunos Retirantes (Alunos Extras):</h4><ul>';
-            itens.forEach(i => {
-                let nomeEx = i.nomeAlunoExtra ? i.nomeAlunoExtra : "Aluno";
-                htmlExtras += `<li><span class="aluno-com-equip">✅ ${nomeEx}</span> — <strong>Equipamento: ${i.numeroEquipamento}</strong></li>`;
-            });
-            htmlExtras += '</ul>';
-            conteudo.innerHTML = htmlExtras;
-            return;
-        }
+            // Formato limpo solicitado: Nome - N°2
+            const descricaoRegistro = `${nomeAluno} - N°${reg.numeroEquipamento || '?'}`;
+            const tipo = reg.tipoEquipamento || '-';
+            const professor = reg.nomeProfessor || '-';
 
-        fetch(urlBase + '/api/alunos/' + primeiroItemComAluno.aluno.id)
-            .then(res => res.json())
-            .then(alunoExemplo => {
-                if (!alunoExemplo || !alunoExemplo.turma) {
-                    throw new Error("Turma não encontrada");
-                }
-                return fetch(urlBase + '/api/alunos/turma/' + alunoExemplo.turma.id)
-                    .then(res => res.json())
-                    .then(todosAlunosDaTurma => {
-                        todosAlunosDaTurma.sort((a, b) => a.nome.localeCompare(b.nome));
+            corpoTabela.innerHTML += `
+                <tr>
+                    <td>${dataFormatada}</td>
+                    <td>${professor}</td>
+                    <td><b>${descricaoRegistro}</b></td>
+                    <td>${tipo}</td>
+                </tr>
+            `;
+        });
+    }
 
-                        let html = `<h4>Turma (${alunoExemplo.turma.nome}) - Lista Completa:</h4><ul>`;
+    // Filtro de pesquisa em tempo real (pesquisa por série, aluno ou professor na lista já carregada)
+    function filtrarTabelaLocal() {
+        const termo = document.getElementById('barraPesquisa').value.toLowerCase();
 
-                        todosAlunosDaTurma.forEach(alunoTurma => {
-                            let registroDoAluno = itens.find(i => i.aluno && i.aluno.id === alunoTurma.id);
+        const registrosFiltrados = todosOsRegistrosDoDia.filter(reg => {
+            const nomeAluno = (reg.aluno ? reg.aluno.nome : '') || reg.nomeAlunoExtra || '';
+            const numEquip = reg.numeroEquipamento || '';
+            const professor = reg.nomeProfessor || '';
+            const tipo = reg.tipoEquipamento || '';
 
-                            if (registroDoAluno) {
-                                html += `<li class="aluno-com-equip">✅ ${alunoTurma.nome} — <strong>Pegou o Equipamento: ${registroDoAluno.numeroEquipamento}</strong></li>`;
-                            } else {
-                                html += `<li style="color: #888;">⚪ ${alunoTurma.nome} (Sem equipamento)</li>`;
-                            }
-                        });
+            return nomeAluno.toLowerCase().includes(termo) ||
+                numEquip.toLowerCase().includes(termo) ||
+                professor.toLowerCase().includes(termo) ||
+                tipo.toLowerCase().includes(termo);
+        });
 
-                        itens.filter(i => !i.aluno && i.nomeAlunoExtra).forEach(extra => {
-                            html += `<li class="aluno-com-equip">✅ [Extra] ${extra.nomeAlunoExtra} — <strong>Pegou o Equipamento: ${extra.numeroEquipamento}</strong></li>`;
-                        });
-
-                        html += `</ul>`;
-                        conteudo.innerHTML = html;
-                    });
-            })
-            .catch(err => {
-                console.error(err);
-                conteudo.innerHTML = '<p style="color: red;">Erro ao montar a lista da turma.</p>';
-            });
-    };
+        renderizarTabela(registrosFiltrados);
+    }
 </script>
 </body>
-</html>
+</html>S

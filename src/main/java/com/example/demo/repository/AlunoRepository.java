@@ -6,6 +6,5 @@ import java.util.List;
 
 public interface AlunoRepository extends JpaRepository<Aluno, Long> {
 
-    // O Spring gera o SQL de busca automaticamente só pelo nome do método!
     List<Aluno> findByTurmaId(Long turmaId);
 }

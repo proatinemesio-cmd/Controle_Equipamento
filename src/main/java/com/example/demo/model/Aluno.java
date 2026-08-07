@@ -11,7 +11,7 @@ public class Aluno {
 
     private String nome;
 
-    @ManyToOne // Vários alunos para uma turma
+    @ManyToOne
     @JoinColumn(name = "turma_id")
     private Turma turma;
 
