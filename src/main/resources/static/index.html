@@ -70,17 +70,34 @@
             preencherSelectTurmas(JSON.parse(turmasSalvas));
         }
 
-        // 2. Busca da API em segundo plano para garantir que esteja atualizado
+        // 2. Busca da API em segundo plano com ordenação correta (6° ano até 3° Médio)
         fetch(urlBase + '/api/turmas')
             .then(response => response.json())
             .then(turmas => {
-                // Ordena do 6° até o 3° (decrescente)
-                turmas.sort((a, b) => b.nome.localeCompare(a.nome, 'pt-BR', { numeric: true }));
+                turmas.sort((a, b) => {
+                    function parseTurma(nome) {
+                        const match = nome.match(/(\d+)/);
+                        const num = match ? parseInt(match[1]) : 0;
+                        let ordemBase = num;
+                        if (num >= 1 && num <= 3) {
+                            ordemBase = num + 10; // Joga 1°, 2°, 3° para depois do 9°
+                        }
+                        return { ordem: ordemBase, nome: nome };
+                    }
 
-                // Salva no cache local para as próximas vezes abrirem instantaneamente
+                    const t1 = parseTurma(a.nome);
+                    const t2 = parseTurma(b.nome);
+
+                    if (t1.ordem !== t2.ordem) {
+                        return t1.ordem - t2.ordem;
+                    }
+                    return t1.nome.localeCompare(t2.nome, 'pt-BR');
+                });
+
+                // Salva no cache local otimizado
                 localStorage.setItem('cache_turmas', JSON.stringify(turmas));
 
-                // Atualiza o select com os dados frescos do servidor
+                // Atualiza o select com os dados ordenados do servidor
                 preencherSelectTurmas(turmas);
             })
             .catch(err => console.error("Erro ao buscar turmas:", err));
