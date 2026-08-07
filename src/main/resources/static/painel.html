@@ -9,42 +9,39 @@
         .container { background-color: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
         h2 { text-align: center; color: #333; }
 
+        /* Filtros Juntos (Barra de Pesquisa + Data) */
         .filtros-container { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
-        .filtros-container input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 5px; min-width: 200px; }
+        .filtros-container input, .filtros-container select { flex: 1; padding: 12px; border: 1px solid #ccc; border-radius: 5px; font-size: 14px; min-width: 180px; }
 
-        .tabela-registros { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        .tabela-registros th, .tabela-registros td { border: 1px solid #ddd; padding: 10px; text-align: left; font-size: 14px; }
-        .tabela-registros th { background-color: #007bff; color: white; }
-        .tabela-registros tr:nth-child(even) { background-color: #f9f9f9; }
-        .sem-registros { text-align: center; padding: 20px; color: #777; font-style: italic; }
+        /* Estilo em Caixas (Cards) */
+        .grid-registros { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 15px; margin-top: 15px; }
+        .card-registro { background: #fff; border: 1px solid #e0e0e0; border-left: 5px solid #007bff; border-radius: 8px; padding: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); transition: 0.2s; }
+        .card-registro:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        .card-titulo { font-size: 16px; font-weight: bold; color: #333; margin-bottom: 8px; }
+        .card-info { font-size: 13px; color: #555; margin-bottom: 4px; }
+        .card-tag { display: inline-block; background-color: #e9ecef; color: #495057; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; margin-top: 8px; }
+
+        .sem-registros { text-align: center; padding: 30px; color: #777; font-style: italic; grid-column: 1 / -1; }
     </style>
 </head>
 <body>
 <div class="container">
     <h2>📊 Painel de Retiradas</h2>
 
+    <!-- Filtros Juntos: Pesquisa de Texto e Data -->
     <div class="filtros-container">
-        <input type="text" id="barraPesquisa" placeholder="Pesquisar por aluno, professor ou série..." onkeyup="filtrarTabelaLocal()">
-        <input type="date" id="filtroData" onchange="carregarRegistrosPainel()" style="flex: 0 0 160px;">
+        <input type="text" id="barraPesquisa" placeholder="🔍 Pesquisar por série, aluno ou professor..." onkeyup="aplicarFiltros()">
+        <input type="date" id="filtroData" onchange="carregarRegistrosPainel()">
     </div>
 
-    <table class="tabela-registros">
-        <thead>
-        <tr>
-            <th>Data/Hora</th>
-            <th>Professor</th>
-            <th>Registro (Nome - N° Equipamento)</th>
-            <th>Tipo</th>
-        </tr>
-        </thead>
-        <tbody id="corpoTabela">
-        <tr><td colspan="4" class="sem-registros">Carregando registros de hoje...</td></tr>
-        </tbody>
-    </table>
+    <!-- Exibição em Caixas/Cards -->
+    <div id="gridRegistros" class="grid-registros">
+        <div class="sem-registros">Carregando registros de hoje...</div>
+    </div>
 </div>
 
 <script>
-    const urlBase = '';
+    const urlBase = ''; // Deixe vazio se estiver no mesmo servidor
     let todosOsRegistrosDoDia = [];
 
     window.onload = function() {
@@ -55,7 +52,7 @@
         carregarRegistrosPainel();
     };
 
-    // Função para carregar os registros da data selecionada
+    // Carrega os registros do backend com base na data selecionada
     async function carregarRegistrosPainel() {
         const dataSelecionada = document.getElementById('filtroData').value;
         let url = urlBase + '/api/registros';
@@ -67,23 +64,25 @@
         try {
             const resposta = await fetch(url);
             todosOsRegistrosDoDia = await resposta.json();
-            renderizarTabela(todosOsRegistrosDoDia);
+            aplicarFiltros(); // Aplica também o filtro de texto se já houver algo digitado
         } catch (erro) {
             console.error("Erro ao carregar registros:", erro);
-            document.getElementById('corpoTabela').innerHTML = `<tr><td colspan="4" class="sem-registros" style="color: red;">Erro ao carregar dados do servidor.</td></tr>`;
+            document.getElementById('gridRegistros').innerHTML = `<div class="sem-registros" style="color: red;">Erro ao carregar dados do servidor.</div>`;
         }
     }
 
-    function renderizarTabela(registros) {
-        const corpoTabela = document.getElementById('corpoTabela');
-        corpoTabela.innerHTML = '';
+    // Renderiza os dados em formato de caixas (cards) intuitivas
+    function renderizarCards(registros) {
+        const grid = document.getElementById('gridRegistros');
+        grid.innerHTML = '';
 
         if (!registros || registros.length === 0) {
-            corpoTabela.innerHTML = `<tr><td colspan="4" class="sem-registros">Nenhum registro encontrado para esta data.</td></tr>`;
+            grid.innerHTML = `<div class="sem-registros">Nenhum registro encontrado.</div>`;
             return;
         }
 
         registros.forEach(reg => {
+            // Descobre o nome do aluno (da lista ou extra)
             let nomeAluno = '';
             if (reg.aluno && reg.aluno.nome) {
                 nomeAluno = reg.aluno.nome;
@@ -93,31 +92,31 @@
                 nomeAluno = 'Aluno não identificado';
             }
 
-            // Formata a data e hora bonita (Ex: 07/08/2026 14:30)
+            // Formata a data/hora bonita
             let dataFormatada = '';
             if (reg.dataHora) {
                 const dataObj = new Date(reg.dataHora);
-                dataFormatada = dataObj.toLocaleString('pt-BR');
+                dataFormatada = dataObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) + ' - ' + dataObj.toLocaleDateString('pt-BR');
             }
 
-            // Formato limpo solicitado: Nome - N°2
-            const descricaoRegistro = `${nomeAluno} - N°${reg.numeroEquipamento || '?'}`;
-            const tipo = reg.tipoEquipamento || '-';
-            const professor = reg.nomeProfessor || '-';
+            const numEquip = reg.numeroEquipamento || '?';
+            const professor = reg.nomeProfessor || 'Não informado';
+            const tipo = reg.tipoEquipamento || 'Geral';
 
-            corpoTabela.innerHTML += `
-                <tr>
-                    <td>${dataFormatada}</td>
-                    <td>${professor}</td>
-                    <td><b>${descricaoRegistro}</b></td>
-                    <td>${tipo}</td>
-                </tr>
+            // Monta o card visual limpo no padrão: Nome - N°X
+            grid.innerHTML += `
+                <div class="card-registro">
+                    <div class="card-titulo">${nomeAluno} - N°${numEquip}</div>
+                    <div class="card-info">👨‍🏫 Prof: <b>${professor}</b></div>
+                    <div class="card-info">🕒 ${dataFormatada}</div>
+                    <div><span class="card-tag">💻 ${tipo}</span></div>
+                </div>
             `;
         });
     }
 
-    // Filtro de pesquisa em tempo real (pesquisa por série, aluno ou professor na lista já carregada)
-    function filtrarTabelaLocal() {
+    // Filtra simultaneamente a barra de texto e mantém a data selecionada
+    function aplicarFiltros() {
         const termo = document.getElementById('barraPesquisa').value.toLowerCase();
 
         const registrosFiltrados = todosOsRegistrosDoDia.filter(reg => {
@@ -132,8 +131,8 @@
                 tipo.toLowerCase().includes(termo);
         });
 
-        renderizarTabela(registrosFiltrados);
+        renderizarCards(registrosFiltrados);
     }
 </script>
 </body>
-</html>S
+</html>
