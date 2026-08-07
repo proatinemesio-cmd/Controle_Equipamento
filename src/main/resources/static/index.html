@@ -9,11 +9,11 @@
         .container { background-color: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
         h2 { text-align: center; color: #333; }
         label { font-weight: bold; display: block; margin-top: 15px; color: #555; }
-        select, input[type="text"], input[type="number"] { width: 100%; padding: 12px; margin-top: 5px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; font-size: 14px; }
+        select, input[type="text"], input[type="number"] { width: 100%; padding: 12px; margin-top: 5px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; font-size: 14px; background-color: #fff; }
 
-        /* Estilo para os atalhos de tipo de equipamento */
+        /* Estilo dos botões de seleção de tipo de equipamento */
         .atalhos-equip { display: flex; gap: 8px; margin-top: 8px; }
-        .btn-atalho { flex: 1; background-color: #e9ecef; border: 1px solid #ced4da; padding: 8px; border-radius: 5px; cursor: pointer; font-size: 13px; font-weight: bold; color: #495057; text-align: center; transition: 0.2s; }
+        .btn-atalho { flex: 1; background-color: #e9ecef; border: 1px solid #ced4da; padding: 12px; border-radius: 5px; cursor: pointer; font-size: 14px; font-weight: bold; color: #495057; text-align: center; transition: 0.2s; }
         .btn-atalho:hover, .btn-atalho.ativo { background-color: #007bff; color: white; border-color: #007bff; }
 
         .lista-alunos { margin-top: 20px; border-top: 2px solid #eee; padding-top: 15px; }
@@ -36,20 +36,18 @@
         <label>Nome do Professor:</label>
         <input type="text" id="professor" placeholder="Digite seu nome" required>
 
-        <!-- Campo Único Inteligente para Turma (Digitar ou Selecionar) -->
-        <label>Turma / Série:</label>
-        <input type="text" id="inputTurma" list="listaTurmasDatalist" placeholder="Digite ou selecione a turma (Ex: 6b, 1a...)" autocomplete="off">
-        <datalist id="listaTurmasDatalist">
-            <!-- Preenchido via JavaScript -->
-        </datalist>
+        <!-- Select Tradicional de Turmas -->
+        <label>Turma:</label>
+        <select id="turma">
+            <option value="">Selecione uma turma...</option>
+        </select>
 
-        <!-- Campo de Tipo de Equipamento com Atalhos -->
+        <!-- Apenas os botões de seleção de Tipo de Equipamento (Sem input livre) -->
         <label>Tipo de Equipamento:</label>
-        <input type="text" id="tipoEquipamento" placeholder="Ex: Chromebooks, Tablets..." required>
         <div class="atalhos-equip">
-            <div class="btn-atalho" onclick="selecionarTipo('Chromebooks', this)">Chromebooks</div>
-            <div class="btn-atalho" onclick="selecionarTipo('Tablets', this)">Tablets</div>
-            <div class="btn-atalho" onclick="selecionarTipo('Notebooks', this)">Notebooks</div>
+            <div class="btn-atalho" id="btn-Chromebooks" onclick="selecionarTipo('Chromebooks', this)">Chromebooks</div>
+            <div class="btn-atalho" id="btn-Notebooks" onclick="selecionarTipo('Notebooks', this)">Notebooks</div>
+            <div class="btn-atalho" id="btn-Tablets" onclick="selecionarTipo('Tablets', this)">Tablets</div>
         </div>
 
         <div id="areaAlunos" class="lista-alunos" style="display: none;">
@@ -63,8 +61,7 @@
 
 <script>
     const urlBase = '';
-    let listaTurmasGlobal = [];
-    let turmaSelecionadaId = null;
+    let tipoEquipamentoSelecionado = '';
 
     window.onload = function() {
         fetch(urlBase + '/api/turmas')
@@ -72,42 +69,36 @@
             .then(turmas => {
                 // Ordena do 6° até o 3° (decrescente)
                 turmas.sort((a, b) => b.nome.localeCompare(a.nome, 'pt-BR', { numeric: true }));
-                listaTurmasGlobal = turmas;
 
-                const datalist = document.getElementById('listaTurmasDatalist');
-                datalist.innerHTML = '';
+                const select = document.getElementById('turma');
+                select.innerHTML = '<option value="">Selecione uma turma...</option>';
                 turmas.forEach(t => {
-                    datalist.innerHTML += `<option value="${t.nome}"></option>`;
+                    select.innerHTML += `<option value="${t.id}">${t.nome}</option>`;
                 });
             })
             .catch(err => console.error("Erro ao buscar turmas:", err));
     };
 
-    // Monitora o que o usuário digita ou seleciona no campo único de turma
-    document.getElementById('inputTurma').addEventListener('input', function() {
-        const valorDigitado = this.value.trim();
+    // Função para selecionar o tipo de equipamento através dos botões
+    window.selecionarTipo = function(tipo, elemento) {
+        tipoEquipamentoSelecionado = tipo;
+        document.querySelectorAll('.btn-atalho').forEach(b => b.classList.remove('ativo'));
+        elemento.classList.add('ativo');
+    }
 
-        // Tenta achar uma turma correspondente ignorando maiúsculas, espaços e símbolos (°/º)
-        const valorLimpo = valorDigitado.toLowerCase().replace(/°|º|\s/g, '');
+    let alunosDaTurmaAtual = [];
 
-        const turmaEncontrada = listaTurmasGlobal.find(t => {
-            const nomeLimpo = t.nome.toLowerCase().replace(/°|º|\s/g, '');
-            return nomeLimpo === valorLimpo;
-        });
-
-        if (turmaEncontrada) {
-            turmaSelecionadaId = turmaEncontrada.id;
-            carregarAlunosDaTurma(turmaSelecionadaId);
-        } else {
-            turmaSelecionadaId = null;
-            document.getElementById('areaAlunos').style.display = 'none';
-            document.getElementById('btnAdicionarExtra').style.display = 'none';
-        }
-    });
-
-    function carregarAlunosDaTurma(turmaId) {
+    document.getElementById('turma').addEventListener('change', function() {
+        const turmaId = this.value;
         const areaAlunos = document.getElementById('areaAlunos');
         const btnExtra = document.getElementById('btnAdicionarExtra');
+
+        if(!turmaId) {
+            areaAlunos.style.display = 'none';
+            btnExtra.style.display = 'none';
+            alunosDaTurmaAtual = [];
+            return;
+        }
 
         fetch(urlBase + '/api/alunos/turma/' + turmaId)
             .then(response => response.json())
@@ -118,16 +109,7 @@
                 areaAlunos.style.display = 'block';
                 btnExtra.style.display = 'block';
             });
-    }
-
-    // Função para os botões de atalho de tipo de equipamento
-    window.selecionarTipo = function(tipo, elemento) {
-        document.getElementById('tipoEquipamento').value = tipo;
-        document.querySelectorAll('.btn-atalho').forEach(b => b.classList.remove('ativo'));
-        elemento.classList.add('ativo');
-    }
-
-    let alunosDaTurmaAtual = [];
+    });
 
     function renderizarTelaAlunos() {
         const areaAlunos = document.getElementById('areaAlunos');
@@ -216,11 +198,11 @@
 
     document.getElementById('btnSalvar').addEventListener('click', function() {
         const professor = document.getElementById('professor').value.trim();
-        const tipoEquipamento = document.getElementById('tipoEquipamento').value.trim();
+        const turmaId = document.getElementById('turma').value;
 
         if(!professor) { alert("Preencha o nome do professor!"); return; }
-        if(!turmaSelecionadaId) { alert("Selecione uma turma válida da lista!"); return; }
-        if(!tipoEquipamento) { alert("Informe ou selecione o tipo de equipamento!"); return; }
+        if(!turmaId) { alert("Selecione uma turma!"); return; }
+        if(!tipoEquipamentoSelecionado) { alert("Selecione o tipo de equipamento clicando em um dos botões (Chromebooks, Notebooks ou Tablets)!"); return; }
 
         const promessas = [];
 
@@ -237,7 +219,7 @@
                     body: JSON.stringify({
                         nomeProfessor: professor,
                         numeroEquipamento: inputEquip.value.trim(),
-                        tipoEquipamento: tipoEquipamento,
+                        tipoEquipamento: tipoEquipamentoSelecionado,
                         dataHora: dataLocal,
                         aluno: { id: linha.getAttribute('data-id') }
                     })
@@ -263,7 +245,7 @@
                     body: JSON.stringify({
                         nomeProfessor: professor,
                         numeroEquipamento: equipVal,
-                        tipoEquipamento: tipoEquipamento,
+                        tipoEquipamento: tipoEquipamentoSelecionado,
                         dataHora: dataLocal,
                         nomeAlunoExtra: nomeVal
                     })
@@ -305,4 +287,4 @@
     });
 </script>
 </body>
-</html>
+</html>s
