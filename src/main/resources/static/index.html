@@ -16,7 +16,7 @@
         .btn-atalho { flex: 1; background-color: #e9ecef; border: 1px solid #ced4da; padding: 12px; border-radius: 5px; cursor: pointer; font-size: 14px; font-weight: bold; color: #495057; text-align: center; transition: 0.2s; }
         .btn-atalho:hover, .btn-atalho.ativo { background-color: #007bff; color: white; border-color: #007bff; }
 
-        .lista-alunos { margin-top: 20px; border-top: 2px solid #eee; padding-top: 15px; }
+        .lista-alunos { margin-top: 20px; border-top: 2px solid #eee; padding-top: 15px; position: relative; min-height: 100px; }
         .linha-aluno { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #eee; }
         .linha-aluno span { flex: 1; font-size: 14px; }
         .linha-aluno input { width: 90px; padding: 8px; border: 1px solid #ccc; border-radius: 5px; text-align: center; }
@@ -27,7 +27,7 @@
         .btn-salvar { background-color: #28a745; color: white; border: none; padding: 15px; border-radius: 5px; margin-top: 25px; width: 100%; font-size: 18px; font-weight: bold; cursor: pointer; }
         .btn-salvar:hover { background-color: #218838; }
 
-        /* Estilos para o Loading e Mensagens na Tela */
+        /* Overlay Geral (Carregamento ao Salvar) */
         #overlayLoading {
             display: none;
             position: fixed;
@@ -37,46 +37,81 @@
             justify-content: center;
             align-items: center;
         }
-        .spinner-box {
+
+        /* Modal Estilizado de Sucesso/Alerta com botão OK */
+        #modalAlerta {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-box {
             background: white;
-            padding: 30px;
+            padding: 25px 30px;
             border-radius: 10px;
             text-align: center;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            max-width: 320px;
+            width: 90%;
         }
+        .modal-box p { font-size: 16px; color: #333; margin-bottom: 20px; font-weight: bold; line-height: 1.4; }
+        .btn-modal-ok {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            padding: 10px 25px;
+            border-radius: 5px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+        }
+        .btn-modal-ok:hover { background-color: #218838; }
+
+        /* Spinner Geral e Parcial */
         .spinner {
-            border: 5px solid #f3f3f3;
-            border-top: 5px solid #28a745;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #28a745;
             border-radius: 50%;
-            width: 40px;
-            height: 40px;
+            width: 35px;
+            height: 35px;
             animation: spin 1s linear infinite;
-            margin: 0 auto 15px auto;
+            margin: 0 auto 10px auto;
         }
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
 
-        #mensagemTela {
+        /* Loading interno exclusivo da área de alunos */
+        #loadingAlunos {
             display: none;
-            margin-top: 20px;
-            padding: 15px;
-            border-radius: 5px;
-            font-weight: bold;
             text-align: center;
+            padding: 30px;
+            color: #666;
+            font-size: 14px;
+            font-weight: bold;
         }
-        .msg-sucesso { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-        .msg-erro { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
     </style>
 </head>
 <body>
 
-<!-- Tela de Carregamento (Loading) -->
+<!-- Tela de Carregamento Geral (ao Salvar) -->
 <div id="overlayLoading">
-    <div class="spinner-box">
+    <div class="modal-box">
         <div class="spinner"></div>
-        <p style="margin: 0; font-weight: bold; color: #333;">Salvando registros, aguarde...</p>
+        <p style="margin: 0;">Salvando registros, aguarde...</p>
+    </div>
+</div>
+
+<!-- Modal Personalizado com Botão OK (Substitui o Alert) -->
+<div id="modalAlerta">
+    <div class="modal-box">
+        <p id="textoModalMensagem">Mensagem aqui</p>
+        <button type="button" class="btn-modal-ok" onclick="fecharModal()">OK</button>
     </div>
 </div>
 
@@ -101,15 +136,18 @@
             <div class="btn-atalho" id="btn-Tablets" onclick="selecionarTipo('Tablets', this)">Tablets</div>
         </div>
 
+        <!-- Área dos Alunos com Loading Exclusivo -->
         <div id="areaAlunos" class="lista-alunos" style="display: none;">
+            <div id="loadingAlunos">
+                <div class="spinner"></div>
+                Carregando alunos da turma...
+            </div>
+            <div id="conteudoAlunos"></div>
         </div>
 
         <button type="button" id="btnAdicionarExtra" class="btn-extra" style="display: none;">+ Adicionar aluno que não está na lista</button>
 
         <button type="button" id="btnSalvar" class="btn-salvar">Registrar Retirada</button>
-
-        <!-- Mensagem de feedback direto na tela -->
-        <div id="mensagemTela"></div>
     </form>
 </div>
 
@@ -169,10 +207,27 @@
     }
 
     let alunosDaTurmaAtual = [];
+    let acaoAposModal = null; // Função executada ao clicar em OK no modal
+
+    function mostrarModal(mensagem, callback = null) {
+        document.getElementById('textoModalMensagem').innerHTML = mensagem;
+        document.getElementById('modalAlerta').style.display = 'flex';
+        acaoAposModal = callback;
+    }
+
+    window.fecharModal = function() {
+        document.getElementById('modalAlerta').style.display = 'none';
+        if (typeof acaoAposModal === 'function') {
+            acaoAposModal();
+            acaoAposModal = null;
+        }
+    }
 
     document.getElementById('turma').addEventListener('change', function() {
         const turmaId = this.value;
         const areaAlunos = document.getElementById('areaAlunos');
+        const loadingAlunos = document.getElementById('loadingAlunos');
+        const conteudoAlunos = document.getElementById('conteudoAlunos');
         const btnExtra = document.getElementById('btnAdicionarExtra');
 
         if(!turmaId) {
@@ -182,19 +237,30 @@
             return;
         }
 
+        // Mostra a caixinha de alunos e ativa o loading específico dela
+        areaAlunos.style.display = 'block';
+        loadingAlunos.style.display = 'block';
+        conteudoAlunos.innerHTML = '';
+        btnExtra.style.display = 'none';
+
         fetch(urlBase + '/api/alunos/turma/' + turmaId)
             .then(response => response.json())
             .then(alunos => {
                 alunos.sort((a, b) => a.nome.localeCompare(b.nome));
                 alunosDaTurmaAtual = alunos;
+
+                loadingAlunos.style.display = 'none';
                 renderizarTelaAlunos();
-                areaAlunos.style.display = 'block';
                 btnExtra.style.display = 'block';
+            })
+            .catch(err => {
+                loadingAlunos.style.display = 'none';
+                console.error("Erro ao carregar alunos:", err);
             });
     });
 
     function renderizarTelaAlunos() {
-        const areaAlunos = document.getElementById('areaAlunos');
+        const conteudoAlunos = document.getElementById('conteudoAlunos');
 
         const dadosDigitados = {};
         document.querySelectorAll('.linha-aluno[data-id]').forEach(linha => {
@@ -210,11 +276,11 @@
             extrasSalvos.push({ nome, equip });
         });
 
-        areaAlunos.innerHTML = `<h3>Lista de Alunos</h3>`;
+        let html = `<h3>Lista de Alunos</h3>`;
 
         alunosDaTurmaAtual.forEach(aluno => {
             const valorSalvo = dadosDigitados[aluno.id] || '';
-            areaAlunos.innerHTML += `
+            html += `
                 <div class="linha-aluno" data-id="${aluno.id}">
                     <span>${aluno.nome}</span>
                     <input type="text" class="equip-input" placeholder="Nº Equip" value="${valorSalvo}">
@@ -223,7 +289,7 @@
         });
 
         extrasSalvos.forEach((extra, index) => {
-            areaAlunos.innerHTML += `
+            html += `
                 <div class="linha-aluno extra-row" data-index="${index}">
                     <input type="text" class="extra-nome" placeholder="Nome do aluno extra" value="${extra.nome}" style="flex: 1;">
                     <input type="text" class="extra-equip" placeholder="Nº Equip" value="${extra.equip}" style="width: 90px;">
@@ -231,6 +297,8 @@
                 </div>
             `;
         });
+
+        conteudoAlunos.innerHTML = html;
     }
 
     window.removerExtra = function(botao) {
@@ -238,7 +306,7 @@
     };
 
     document.getElementById('btnAdicionarExtra').addEventListener('click', function() {
-        const areaAlunos = document.getElementById('areaAlunos');
+        const conteudoAlunos = document.getElementById('conteudoAlunos');
 
         const dadosDigitados = {};
         document.querySelectorAll('.linha-aluno[data-id]').forEach(linha => {
@@ -256,10 +324,10 @@
 
         extrasSalvos.push({ nome: '', equip: '' });
 
-        areaAlunos.innerHTML = `<h3>Lista de Alunos</h3>`;
+        let html = `<h3>Lista de Alunos</h3>`;
         alunosDaTurmaAtual.forEach(aluno => {
             const valorSalvo = dadosDigitados[aluno.id] || '';
-            areaAlunos.innerHTML += `
+            html += `
                 <div class="linha-aluno" data-id="${aluno.id}">
                     <span>${aluno.nome}</span>
                     <input type="text" class="equip-input" placeholder="Nº Equip" value="${valorSalvo}">
@@ -268,7 +336,7 @@
         });
 
         extrasSalvos.forEach((extra, index) => {
-            areaAlunos.innerHTML += `
+            html += `
                 <div class="linha-aluno extra-row" data-index="${index}">
                     <input type="text" class="extra-nome" placeholder="Nome do aluno extra" value="${extra.nome}" style="flex: 1;">
                     <input type="text" class="extra-equip" placeholder="Nº Equip" value="${extra.equip}" style="width: 90px;">
@@ -276,19 +344,18 @@
                 </div>
             `;
         });
+
+        conteudoAlunos.innerHTML = html;
     });
 
     document.getElementById('btnSalvar').addEventListener('click', function() {
         const professor = document.getElementById('professor').value.trim();
         const turmaId = document.getElementById('turma').value;
         const overlayLoading = document.getElementById('overlayLoading');
-        const mensagemTela = document.getElementById('mensagemTela');
 
-        mensagemTela.style.display = 'none';
-
-        if(!professor) { alert("Preencha o nome do professor!"); return; }
-        if(!turmaId) { alert("Selecione uma turma!"); return; }
-        if(!tipoEquipamentoSelecionado) { alert("Selecione o tipo de equipamento clicando em um dos botões (Chromebooks, Notebooks ou Tablets)!"); return; }
+        if(!professor) { mostrarModal("⚠️ Preencha o nome do professor!"); return; }
+        if(!turmaId) { mostrarModal("⚠️ Selecione uma turma!"); return; }
+        if(!tipoEquipamentoSelecionado) { mostrarModal("⚠️ Selecione o tipo de equipamento clicando em um dos botões (Chromebooks, Notebooks ou Tablets)!"); return; }
 
         const promessas = [];
 
@@ -332,7 +399,7 @@
                         nomeProfessor: professor,
                         numeroEquipamento: equipVal,
                         tipoEquipamento: tipoEquipamentoSelecionado,
-                        dataHoraId: dataLocal,
+                        dataHora: dataLocal,
                         nomeAlunoExtra: nomeVal
                     })
                 }));
@@ -340,35 +407,27 @@
         });
 
         if(erroExtraIncompleto) {
-            alert("⚠️ Há um aluno extra com o nome ou o equipamento incompleto. Preencha ambos ou remova a linha.");
+            mostrarModal("⚠️ Há um aluno extra com o nome ou o equipamento incompleto. Preencha ambos ou remova a linha.");
             return;
         }
 
         if(promessas.length === 0) {
-            alert("Nenhum equipamento foi preenchido para salvar.");
+            mostrarModal("⚠️ Nenhum equipamento foi preenchido para salvar.");
             return;
         }
 
-        // Mostra a tela de carregamento (Spinner)
+        // Mostra o loading na tela inteira só enquanto salva os dados
         overlayLoading.style.display = 'flex';
 
         Promise.all(promessas).then(() => {
             overlayLoading.style.display = 'none';
-
-            // Mostra mensagem bonita na tela em vez de alert
-            mensagemTela.className = 'msg-sucesso';
-            mensagemTela.innerHTML = '✅ Todos os registros salvos com sucesso! Atualizando...';
-            mensagemTela.style.display = 'block';
-
-            setTimeout(() => {
+            // Mostra o modal de sucesso com botão OK, e recarrega a página ao clicar em OK
+            mostrarModal("✅ Todos os registros salvos com sucesso!", function() {
                 location.reload();
-            }, 1500); // Recarrega após 1.5 segundos para o usuário ver a mensagem
+            });
         }).catch(() => {
             overlayLoading.style.display = 'none';
-
-            mensagemTela.className = 'msg-erro';
-            mensagemTela.innerHTML = '❌ Ocorreu um erro ao salvar alguns registros.';
-            mensagemTela.style.display = 'block';
+            mostrarModal("❌ Ocorreu um erro ao salvar alguns registros.");
         });
     });
 
