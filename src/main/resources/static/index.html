@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Controle de Retirada de Equipamentos</title>
+    <title>Controle de Retirada de Equipamentos </title>
     <style>
         body { font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto; background-color: #f4f4f9; }
         .container { background-color: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
@@ -30,7 +30,7 @@
 </head>
 <body>
 <div class="container">
-    <h2>💻 Controle de Equipamentos</h2>
+    <h2>💻 Controle de Equipamentos - Nemésio</h2>
 
     <form id="formRetirada">
         <label>Nome do Professor:</label>
@@ -42,7 +42,7 @@
             <option value="">Selecione uma turma...</option>
         </select>
 
-        <!-- Apenas os botões de seleção de Tipo de Equipamento (Sem input livre) -->
+        <!-- Apenas os botões de seleção de Tipo de Equipamento -->
         <label>Tipo de Equipamento:</label>
         <div class="atalhos-equip">
             <div class="btn-atalho" id="btn-Chromebooks" onclick="selecionarTipo('Chromebooks', this)">Chromebooks</div>
@@ -64,20 +64,39 @@
     let tipoEquipamentoSelecionado = '';
 
     window.onload = function() {
+        // 1. Otimização: Tenta carregar instantaneamente do cache local do navegador
+        const turmasSalvas = localStorage.getItem('cache_turmas');
+        if (turmasSalvas) {
+            preencherSelectTurmas(JSON.parse(turmasSalvas));
+        }
+
+        // 2. Busca da API em segundo plano para garantir que esteja atualizado
         fetch(urlBase + '/api/turmas')
             .then(response => response.json())
             .then(turmas => {
                 // Ordena do 6° até o 3° (decrescente)
                 turmas.sort((a, b) => b.nome.localeCompare(a.nome, 'pt-BR', { numeric: true }));
 
-                const select = document.getElementById('turma');
-                select.innerHTML = '<option value="">Selecione uma turma...</option>';
-                turmas.forEach(t => {
-                    select.innerHTML += `<option value="${t.id}">${t.nome}</option>`;
-                });
+                // Salva no cache local para as próximas vezes abrirem instantaneamente
+                localStorage.setItem('cache_turmas', JSON.stringify(turmas));
+
+                // Atualiza o select com os dados frescos do servidor
+                preencherSelectTurmas(turmas);
             })
             .catch(err => console.error("Erro ao buscar turmas:", err));
     };
+
+    function preencherSelectTurmas(turmas) {
+        const select = document.getElementById('turma');
+        const valorAtual = select.value; // Mantém selecionado caso o usuário já tenha escolhido algo
+
+        select.innerHTML = '<option value="">Selecione uma turma...</option>';
+        turmas.forEach(t => {
+            select.innerHTML += `<option value="${t.id}">${t.nome}</option>`;
+        });
+
+        if (valorAtual) select.value = valorAtual;
+    }
 
     // Função para selecionar o tipo de equipamento através dos botões
     window.selecionarTipo = function(tipo, elemento) {
